@@ -1,4 +1,4 @@
-<title>A Garden, For You</title>
+<title>Hydrangeas, For You</title>
 <style>
   :root{
     --night-top:#241448;
@@ -54,8 +54,8 @@
 </style>
 
 <canvas id="garden"></canvas>
-<h1 class="word">a garden, for you</h1>
-<p class="word">tap anywhere to plant a flower</p>
+<h1 class="word">hydrangeas, for you</h1>
+<p class="word">tap anywhere to plant a hydrangea</p>
 
 <script>
 (function(){
@@ -73,57 +73,89 @@
     if (reduceMotion) render(performance.now());
   }
 
-  /* ---- palettes: outer petal, inner petal, heart ---- */
+  /* ---- hydrangea palettes: light + deep floret tones, pale eye ---- */
   var PALETTES = [
-    { outer:'#ff7a6b', inner:'#e8504f', heart:'#ffd97a' },   // coral poppy
-    { outer:'#ffc145', inner:'#ff9a3d', heart:'#6b3f23' },   // marigold
-    { outer:'#f45fa8', inner:'#d33d8b', heart:'#ffe08a' },   // fuchsia cosmos
-    { outer:'#b78bff', inner:'#9268e8', heart:'#ffe9a8' },   // lilac anemone
-    { outer:'#7fa8ff', inner:'#5e86ee', heart:'#fff0b0' },   // periwinkle
-    { outer:'#ffe9f0', inner:'#f7c7da', heart:'#ffcf6b' }    // blush daisy
+    { light:'#a8c8f8', deep:'#5d7fd4', eye:'#eef2cf' },  // nikko blue
+    { light:'#b9c2f7', deep:'#6f79d8', eye:'#f2ecc9' },  // periwinkle
+    { light:'#d3b3f0', deep:'#9a72cf', eye:'#f6e9d0' },  // lavender
+    { light:'#f7bcd6', deep:'#dd7fae', eye:'#fdf0d2' },  // rose pink
+    { light:'#c7e3f2', deep:'#8fb8dd', eye:'#e9f0c8' },  // powder blue
+    { light:'#f3e9ef', deep:'#d5b9cf', eye:'#e4ecc4' }   // white annabelle
   ];
   var STEM_DARK = '#3e7c59', STEM_LIGHT = '#68b573';
-  var LEAF_A = '#4e9b63', LEAF_B = '#37734c';
+  var LEAF_A = '#4e9b63', LEAF_B = '#37734c', LEAF_VEIN = 'rgba(220,240,210,.35)';
+  var BUD_GREEN = '#7fae6f';
 
   var flowers = [];
-  var driftingPetals = [];
+  var driftingFlorets = [];
   var fireflies = [];
-  var MAX_FLOWERS = 26;
+  var MAX_FLOWERS = 18;
+  var GOLDEN = 2.39996;
 
   function rand(a, b){ return a + Math.random() * (b - a); }
-
+  function clamp01(t){ return t < 0 ? 0 : t > 1 ? 1 : t; }
   function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
   function easeOutBack(t){
     var c1 = 1.70158, c3 = c1 + 1;
     return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
   }
 
+  function hexRGB(h){
+    return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+  }
+  function mix(a, b, t){
+    var A = hexRGB(a), B = hexRGB(b);
+    return 'rgb(' + Math.round(A[0]+(B[0]-A[0])*t) + ',' +
+                    Math.round(A[1]+(B[1]-A[1])*t) + ',' +
+                    Math.round(A[2]+(B[2]-A[2])*t) + ')';
+  }
+  function withAlpha(hex, a){
+    var c = hexRGB(hex);
+    return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+  }
+
   function plantFlower(x, headY, bornAt){
     var groundY = H * rand(0.90, 0.97);
     var h = headY !== null
-      ? Math.min(Math.max(groundY - headY, H * 0.14), H * 0.62)
-      : rand(H * 0.22, H * 0.5);
+      ? Math.min(Math.max(groundY - headY, H * 0.16), H * 0.6)
+      : rand(H * 0.24, H * 0.5);
+    var R = rand(26, 42) * (0.7 + h / (H * 0.6) * 0.55);
+    var palette = PALETTES[Math.floor(Math.random() * PALETTES.length)];
+
+    /* mophead: florets packed on a slightly squashed disc, phyllotaxis spiral */
+    var florets = [];
+    var n = Math.round(R * 1.3);
+    for (var i = 0; i < n; i++){
+      var rr = R * Math.sqrt((i + 0.5) / n) * rand(0.94, 1.05);
+      var aa = i * GOLDEN + rand(-0.15, 0.15);
+      florets.push({
+        x: Math.cos(aa) * rr,
+        y: Math.sin(aa) * rr * 0.92,
+        s: R * 0.22 * rand(0.85, 1.2),
+        rot: rand(0, Math.PI / 2),
+        color: mix(palette.light, palette.deep, rand(0, 0.9)),
+        delay: (rr / R) * 0.55 + rand(0, 0.1)   // blooms from the heart outward
+      });
+    }
+
     flowers.push({
-      x: x,
-      groundY: groundY,
-      h: h,
-      lean: rand(-26, 26),
+      x: x, groundY: groundY, h: h, R: R,
+      lean: rand(-24, 24),
       phase: rand(0, Math.PI * 2),
-      swaySpeed: rand(0.5, 0.9),
-      swayAmp: rand(0.02, 0.05),
-      palette: PALETTES[Math.floor(Math.random() * PALETTES.length)],
-      petalCount: 5 + Math.floor(Math.random() * 4),
-      petalLen: rand(16, 30) * (0.8 + h / (H * 0.6)),
+      swaySpeed: rand(0.4, 0.75),
+      swayAmp: rand(0.015, 0.04),
+      palette: palette,
+      florets: florets,
       born: bornAt,
-      growDur: reduceMotion ? 0 : rand(1800, 2600),
+      growDur: reduceMotion ? 0 : rand(2200, 3200),
       leafT: [rand(0.3, 0.42), rand(0.58, 0.7)],
-      leafSide: Math.random() < 0.5 ? 1 : -1
+      leafSide: Math.random() < 0.5 ? 1 : -1,
+      sprite: null, spritePad: 0
     });
     if (flowers.length > MAX_FLOWERS) flowers.shift();
     flowers.sort(function(a, b){ return a.groundY - b.groundY; });
   }
 
-  /* quadratic bezier point */
   function qPoint(t, x0, y0, cx, cy, x1, y1){
     var u = 1 - t;
     return [
@@ -132,28 +164,74 @@
     ];
   }
 
-  function drawPetal(len, wid){
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.bezierCurveTo(-wid, -len * 0.35, -wid * 0.6, -len * 0.9, 0, -len);
-    ctx.bezierCurveTo(wid * 0.6, -len * 0.9, wid, -len * 0.35, 0, 0);
-    ctx.fill();
+  /* one hydrangea floret: four rounded petals and a pale eye */
+  function drawFloret(c, s, rot, color, eye){
+    c.save();
+    c.rotate(rot);
+    c.fillStyle = color;
+    for (var k = 0; k < 4; k++){
+      var a = k * Math.PI / 2;
+      c.beginPath();
+      c.ellipse(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55,
+                s * 0.5, s * 0.36, a, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.fillStyle = eye;
+    c.beginPath();
+    c.arc(0, 0, s * 0.18, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
   }
 
   function drawLeaf(len){
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.bezierCurveTo(len * 0.35, -len * 0.42, len * 0.8, -len * 0.4, len, 0);
-    ctx.bezierCurveTo(len * 0.8, len * 0.18, len * 0.35, len * 0.22, 0, 0);
+    ctx.bezierCurveTo(len * 0.3, -len * 0.5, len * 0.8, -len * 0.46, len, 0);
+    ctx.bezierCurveTo(len * 0.8, len * 0.26, len * 0.3, len * 0.3, 0, 0);
     ctx.fill();
+    ctx.strokeStyle = LEAF_VEIN;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(len * 0.08, 0);
+    ctx.lineTo(len * 0.9, -len * 0.02);
+    ctx.stroke();
+  }
+
+  /* render the finished head once, then stamp it every frame */
+  function buildSprite(f){
+    var pad = 34;
+    var size = (f.R + pad) * 2;
+    var oc = document.createElement('canvas');
+    oc.width = oc.height = Math.ceil(size * DPR);
+    var c = oc.getContext('2d');
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    c.translate(f.R + pad, f.R + pad);
+
+    var glow = c.createRadialGradient(0, 0, f.R * 0.2, 0, 0, f.R * 1.45);
+    glow.addColorStop(0, withAlpha(f.palette.deep, 0.4));
+    glow.addColorStop(1, withAlpha(f.palette.deep, 0));
+    c.fillStyle = glow;
+    c.beginPath();
+    c.arc(0, 0, f.R * 1.45, 0, Math.PI * 2);
+    c.fill();
+
+    for (var i = 0; i < f.florets.length; i++){
+      var p = f.florets[i];
+      c.save();
+      c.translate(p.x, p.y);
+      drawFloret(c, p.s, p.rot, p.color, f.palette.eye);
+      c.restore();
+    }
+    f.sprite = oc;
+    f.spritePad = pad;
+    f.spriteSize = size;
   }
 
   function drawFlower(f, now){
     var age = now - f.born;
     var grow = f.growDur === 0 ? 1 : Math.min(age / f.growDur, 1);
-    var stemP = easeOutCubic(Math.min(grow / 0.8, 1));
-    var bloomRaw = Math.max((grow - 0.62) / 0.38, 0);
-    var bloom = bloomRaw >= 1 ? 1 : Math.max(easeOutBack(bloomRaw), 0);
+    var stemP = easeOutCubic(Math.min(grow / 0.75, 1));
+    var bloomRaw = clamp01((grow - 0.55) / 0.45);
 
     var sway = reduceMotion ? 0
       : Math.sin(now / 1000 * f.swaySpeed + f.phase) * f.swayAmp;
@@ -163,19 +241,19 @@
     var tipY = f.groundY - f.h * stemP;
     var cx = f.x + f.lean * 0.25, cy = f.groundY - f.h * stemP * 0.5;
 
-    /* stem */
+    /* stem — hydrangeas have sturdy woody stems */
     ctx.strokeStyle = STEM_DARK;
-    ctx.lineWidth = 3.2;
+    ctx.lineWidth = 4;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(x0, y0);
     ctx.quadraticCurveTo(cx, cy, tipX, tipY);
     ctx.stroke();
     ctx.strokeStyle = STEM_LIGHT;
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.4;
     ctx.stroke();
 
-    /* leaves */
+    /* broad leaves in near-opposite pairs */
     for (var li = 0; li < 2; li++){
       var lt = f.leafT[li];
       if (stemP < lt + 0.08) continue;
@@ -184,23 +262,27 @@
       var side = li === 0 ? f.leafSide : -f.leafSide;
       ctx.save();
       ctx.translate(lp[0], lp[1]);
-      ctx.rotate(side * (-0.5 + sway * 2) + (side < 0 ? Math.PI : 0));
+      ctx.rotate(side * (-0.45 + sway * 2) + (side < 0 ? Math.PI : 0));
       ctx.scale(side * leafGrow, leafGrow);
       ctx.fillStyle = li === 0 ? LEAF_A : LEAF_B;
-      drawLeaf(f.petalLen * 1.5);
+      drawLeaf(f.R * 1.15);
       ctx.restore();
     }
 
-    /* bloom */
-    if (bloom <= 0.01) {
-      /* bud */
-      if (stemP > 0.3){
+    var headOffset = -f.R * 0.55;
+
+    /* green bud cluster before the florets open */
+    if (bloomRaw <= 0.01){
+      if (stemP > 0.35){
         ctx.save();
-        ctx.translate(tipX, tipY);
-        ctx.fillStyle = f.palette.inner;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 4.5 * stemP, 7 * stemP, sway, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.translate(tipX, tipY - 6 * stemP);
+        ctx.fillStyle = BUD_GREEN;
+        for (var b = 0; b < 5; b++){
+          var ba = (b / 5) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.arc(Math.cos(ba) * 3.5 * stemP, Math.sin(ba) * 3 * stemP, 3 * stemP, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
       }
       return;
@@ -208,55 +290,39 @@
 
     ctx.save();
     ctx.translate(tipX, tipY);
-    ctx.rotate(sway * 1.4);
-    ctx.scale(bloom, bloom);
+    ctx.rotate(sway * 1.2);
 
-    var n = f.petalCount;
-    var glowAlpha = 0.35 * bloom;
-    ctx.shadowColor = f.palette.outer;
-    ctx.shadowBlur = 26;
-
-    /* outer petals */
-    ctx.fillStyle = f.palette.outer;
-    ctx.globalAlpha = 1;
-    for (var i = 0; i < n; i++){
-      ctx.save();
-      ctx.rotate((i / n) * Math.PI * 2 + now / 30000);
-      drawPetal(f.petalLen, f.petalLen * 0.5);
-      ctx.restore();
-    }
-    ctx.shadowBlur = 0;
-
-    /* inner petals, offset half-step */
-    ctx.fillStyle = f.palette.inner;
-    for (var j = 0; j < n; j++){
-      ctx.save();
-      ctx.rotate(((j + 0.5) / n) * Math.PI * 2 + now / 30000);
-      drawPetal(f.petalLen * 0.62, f.petalLen * 0.34);
-      ctx.restore();
-    }
-
-    /* heart */
-    ctx.fillStyle = f.palette.heart;
-    ctx.beginPath();
-    ctx.arc(0, 0, f.petalLen * 0.24, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(30,14,40,.35)';
-    for (var s = 0; s < 6; s++){
-      var sa = (s / 6) * Math.PI * 2 + 0.4;
-      ctx.beginPath();
-      ctx.arc(Math.cos(sa) * f.petalLen * 0.13, Math.sin(sa) * f.petalLen * 0.13, 1.1, 0, Math.PI * 2);
-      ctx.fill();
+    if (grow >= 1){
+      /* fully bloomed: stamp the pre-rendered head */
+      if (!f.sprite) buildSprite(f);
+      ctx.drawImage(f.sprite,
+        -f.R - f.spritePad, headOffset - f.R - f.spritePad,
+        f.spriteSize, f.spriteSize);
+    } else {
+      /* blooming: florets pop open one by one, heart first */
+      ctx.translate(0, headOffset);
+      for (var i = 0; i < f.florets.length; i++){
+        var p = f.florets[i];
+        var fp = clamp01((bloomRaw - p.delay) / 0.35);
+        if (fp <= 0) continue;
+        var pop = easeOutBack(fp);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.scale(pop, pop);
+        drawFloret(ctx, p.s, p.rot, p.color, f.palette.eye);
+        ctx.restore();
+      }
     }
     ctx.restore();
 
-    /* shed a petal now and then */
-    if (!reduceMotion && bloom >= 1 && driftingPetals.length < 50 && Math.random() < 0.003){
-      driftingPetals.push({
-        x: tipX, y: tipY,
-        vx: rand(-0.2, 0.5), vy: rand(0.25, 0.55),
-        rot: rand(0, Math.PI * 2), vr: rand(-0.02, 0.02),
-        len: f.petalLen * 0.8, color: f.palette.outer,
+    /* shed a floret now and then */
+    if (!reduceMotion && grow >= 1 && driftingFlorets.length < 40 && Math.random() < 0.0025){
+      var shed = f.florets[Math.floor(Math.random() * f.florets.length)];
+      driftingFlorets.push({
+        x: tipX + shed.x, y: tipY + headOffset + shed.y,
+        vx: rand(-0.2, 0.45), vy: rand(0.2, 0.5),
+        rot: rand(0, Math.PI * 2), vr: rand(-0.03, 0.03),
+        s: shed.s * 0.9, color: shed.color, eye: f.palette.eye,
         life: 1, phase: rand(0, Math.PI * 2)
       });
     }
@@ -271,14 +337,12 @@
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, H);
 
-    /* horizon glow */
     var glow = ctx.createRadialGradient(W * 0.5, H * 0.95, 0, W * 0.5, H * 0.95, W * 0.7);
     glow.addColorStop(0, 'rgba(255,180,140,.18)');
     glow.addColorStop(1, 'rgba(255,180,140,0)');
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, W, H);
 
-    /* rolling ground */
     ctx.fillStyle = '#181026';
     ctx.beginPath();
     ctx.moveTo(0, H * 0.92);
@@ -309,19 +373,17 @@
   }
 
   function drawDrifting(now){
-    for (var i = driftingPetals.length - 1; i >= 0; i--){
-      var p = driftingPetals[i];
-      p.x += p.vx + Math.sin(now / 900 + p.phase) * 0.6;
+    for (var i = driftingFlorets.length - 1; i >= 0; i--){
+      var p = driftingFlorets[i];
+      p.x += p.vx + Math.sin(now / 900 + p.phase) * 0.55;
       p.y += p.vy;
       p.rot += p.vr;
-      p.life -= 0.0022;
-      if (p.life <= 0 || p.y > H + 20){ driftingPetals.splice(i, 1); continue; }
+      p.life -= 0.002;
+      if (p.life <= 0 || p.y > H + 20){ driftingFlorets.splice(i, 1); continue; }
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.rotate(p.rot);
       ctx.globalAlpha = Math.min(p.life, 1) * 0.9;
-      ctx.fillStyle = p.color;
-      drawPetal(p.len, p.len * 0.45);
+      drawFloret(ctx, p.s, p.rot, p.color, p.eye);
       ctx.restore();
     }
     ctx.globalAlpha = 1;
@@ -334,7 +396,6 @@
     drawDrifting(now);
     drawFireflies(now, true);
 
-    /* vignette */
     var v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
     v.addColorStop(0, 'rgba(10,5,20,0)');
     v.addColorStop(1, 'rgba(10,5,20,.38)');
@@ -362,14 +423,14 @@
   }
 
   var t0 = performance.now();
-  var starters = 7;
+  var starters = 6;
   for (var k = 0; k < starters; k++){
     var sx = W * (0.1 + 0.8 * (k / (starters - 1))) + rand(-W * 0.04, W * 0.04);
-    plantFlower(sx, null, reduceMotion ? t0 : t0 + 400 + k * rand(350, 650));
+    plantFlower(sx, null, reduceMotion ? t0 : t0 + 400 + k * rand(400, 700));
   }
 
   canvas.addEventListener('pointerdown', function(e){
-    var x = Math.min(Math.max(e.clientX, 14), W - 14);
+    var x = Math.min(Math.max(e.clientX, 20), W - 20);
     plantFlower(x, e.clientY, performance.now());
     if (reduceMotion) render(performance.now());
   });
